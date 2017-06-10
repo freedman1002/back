@@ -1,0 +1,65 @@
+install openssl on win32:
+
+download last openssl from https://www.openssl.org/source/
+download and install ActiveState Perl from https://www.activestate.com/activeperl/downloads
+
+this is variables for x86 (Path, INCLUDE, LIB, LIBPATH are important)
+
+	set
+	ALLUSERSPROFILE=C:\ProgramData
+	APPDATA=C:\Users\freedman2\AppData\Roaming
+	CommonProgramFiles=C:\Program Files\Common Files
+	COMPUTERNAME=DESKTOP-6S7BRQJ
+	ComSpec=C:\Windows\system32\cmd.exe
+	HOMEDRIVE=C:
+	HOMEPATH=\Users\freedman2
+	INCLUDE=C:\Program Files\Microsoft Visual Studio 14.0\VC\INCLUDE;C:\Program Files\Microsoft Visual Studio 14.0\VC\ATLMFC\INCLUDE;C:\Program Files\Windows Kits\10\Include\10.0.10240.0\ucrt;C:\Program Files\Windows Kits\10\Include\10.0.10150.0\ucrt;C:\Program Files\Windows Phone Kits\8.1\Include;C:\Program Files\Windows Phone Kits\8.1\Include\minwin;C:\Program Files\Windows Phone Kits\8.1\Include\mincore;C:\Program Files\Windows Phone Kits\8.1\Include\abi;C:\Program Files\Windows Phone Kits\8.1\Include\wrl;C:\Program Files\Windows Kits\8.1\Include\um;C:\Program Files\Windows Kits\8.1\Include\shared;C:\Program Files\Windows Kits\8.1\Include\winrt
+	LIB=C:\Program Files\Microsoft Visual Studio 14.0\VC\LIB\x86;C:\Program Files\Microsoft Visual Studio 14.0\VC\bin\x86;C:\Program Files\Microsoft Visual Studio 14.0\VC\ATLMFC\LIB\;C:\Program Files\Windows Kits\10\Lib\10.0.10150.0\ucrt\x86;C:\Program Files\Windows Kits\10\Lib\10.0.10240.0\ucrt\x86;C:\Program Files\Windows Phone Kits\8.1\lib\x86;C:\Program Files\Windows Kits\8.1\Lib\winv6.3\um\x86;C:\Program Files\Microsoft Visual Studio 14.0\VC\lib\store;C:\Program Files\Microsoft Visual Studio 14.0\VC\lib
+	LIBPATH=C:\Windows\Microsoft.NET\Framework64\v4.0.30319;C:\Program Files\Microsoft Visual Studio 14.0\VC\LIB;C:\Program Files\Microsoft Visual Studio 14.0\VC\ATLMFC\LIB;C:\Program Files\Windows Kits\10\UnionMetadata;C:\Program Files\Windows Kits\10\References;C:\Program Files\Windows Kits\10\References\Windows.Foundation.FoundationContract\1.0.0.0;C:\Program Files\Windows Kits\10\Redist\ucrt\DLLs\x86:\Program Files\Microsoft SDKs\Windows Kits\10\ExtensionSDKs\Microsoft.UniversalCRT.Debug\10.0.10240.0\Redist\Debug\x86;C:\Program Files\Microsoft Visual Studio 14.0\VC\lib
+	LOCALAPPDATA=C:\Users\freedman2\AppData\Local
+	LOGONSERVER=\\DESKTOP-6S7BRQJ
+	NUMBER_OF_PROCESSORS=1
+	OneDrive=C:\Users\freedman2\OneDrive
+	OS=Windows_NT
+	Path=C:\Perl\site\bin;C:\Perl\bin;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Users\freedman2\.dnx\bin;C:\Program Files\Microsoft DNX\Dnvm\;C:\Program Files\Microsoft SQL Server\120\Tools\Binn\;C:\Program Files\Windows Kits\8.1\Windows Performance Toolkit\;C:\Users\freedman2\AppData\Local\Microsoft\WindowsApps;C:\Program Files\Microsoft Visual Studio 14.0\VC\bin\;C:\Program Files\Windows Kits\8.1\bin\x86
+	PATHEXT=.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC
+	PROCESSOR_ARCHITECTURE=x86
+	PROCESSOR_IDENTIFIER=x86 Family 6 Model 94 Stepping 3, GenuineIntel
+	PROCESSOR_LEVEL=6
+	PROCESSOR_REVISION=5e03
+	ProgramData=C:\ProgramData
+	ProgramFiles=C:\Program Files
+	PROMPT=$P$G
+	PSModulePath=C:\Program Files\WindowsPowerShell\Modules;C:\Windows\system32\WindowsPowerShell\v1.0\Modules
+	PUBLIC=C:\Users\Public
+	SESSIONNAME=Console
+	SystemDrive=C:
+	SystemRoot=C:\Windows
+	TEMP=C:\Users\FREEDM~1\AppData\Local\Temp
+	TMP=C:\Users\FREEDM~1\AppData\Local\Temp
+	USERDOMAIN=DESKTOP-6S7BRQJ
+	USERDOMAIN_ROAMINGPROFILE=DESKTOP-6S7BRQJ
+	USERNAME=freedman2
+	USERPROFILE=C:\Users\freedman2
+	VS110COMNTOOLS=C:\Program Files\Microsoft Visual Studio 11.0\Common7\Tools\
+	VS120COMNTOOLS=C:\Program Files\Microsoft Visual Studio 12.0\Common7\Tools\
+	VS140COMNTOOLS=C:\Program Files\Microsoft Visual Studio 14.0\Common7\Tools\
+	windir=C:\Windows
+
+Run C:\Program Files\Microsoft Visual Studio 10.0\Common7\Tools\vsvars32.bat to get visual studio environment setup.
+
+Create a new folder C:\openssl-xxx Download latest OpenSSL source Extract the file to C:\openssl-xxx
+
+Create a new folder C:\openssl-xxx-bin
+
+Download & install ActiveState Perl @ ActiveState Perl
+
+open cmd Browse to C:\openssl-xxx Run "perl Configure VC-WIN32 no-asm – -prefix=C:\openssl-xxx-bin" 
+
+Run "ms\do_ms"
+
+Run "nmake -f ms\nt.mak". (for dynamic use ntdd.mak in all bellow)
+
+Once the compilation is completed. You may test the output by running this command "nmake -f ms\nt.mak test". You should get all the tests pass.
+
+Run command "nmake -f ms\ntdll.mak install". It will copy all the libraries to specific directory that will say you.
