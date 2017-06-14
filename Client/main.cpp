@@ -1,13 +1,14 @@
 #include <iostream>
+#include <fstream>
 #include <conio.h>
-#include <string.h>
+#include <string>
+#include <direct.h>
 #include <Windows.h>
 #include <stdio.h>
 #include <thread>
 #include <iomanip>
 #include <chrono>
 #include <ctime>
-#include <mutex>
 
 #include "libcurl/include/curl/curl.h"
 
@@ -17,13 +18,19 @@
 #pragma comment(lib, "libcurl/lib/libcurl_a32.lib")
 #endif
 
-#define FILEPATH_MAX 200
 
+
+#define FILEPATH_MAX 200
 #define POST_INIT "init"
 #define POST_ALIVE "alive"
 #define POST_CONTROL "control"
 #define POST_RESUME "resume"
 #define POST_PRIORITY "priority"
+
+#define TASK_INVALID -1
+#define TASK_UNKNOWN 0
+
+#define MAX_SEM_COUNT 1
 
 
 using namespace std;
@@ -40,7 +47,19 @@ class AClass {
  */
 
 
-mutex mutex_push, mutex_alive, mutex_checkbuffer;
+
+ //#define MODE_SPLIT  //split large conections
+
+/* notes
+* 1. server must send data just in answer to post_control.
+* 
+* 
+*/
+
+HANDLE semaphore_alive;
+HANDLE semaphore_resultfile;
+HANDLE semaphore_checkresult;
+DWORD dwWaitResult;
 bool alive = TRUE;
 int block_size_m = 1;
 
@@ -97,13 +116,13 @@ size_t read_data(void *ptr, size_t size, size_t nmemb, FILE *stream) {
 	return read;
 }
 
-CURLcode get_skipssl(CURL *curl_handler, string url, char outfilename[]) {
+CURLcode get_skipssl(CURL *curl_handler, char *url, char download_filename[]) {
 
 	curl_easy_setopt(curl_handler, CURLOPT_URL, url);
 	//skip ssl cetification
 	curl_easy_setopt(curl_handler, CURLOPT_SSL_VERIFYPEER, FALSE);
 
-	FILE *fp = fopen(outfilename, "wb");
+	FILE *fp = fopen(download_filename, "wb");
 	curl_easy_setopt(curl_handler, CURLOPT_WRITEFUNCTION, write_data);
 	curl_easy_setopt(curl_handler, CURLOPT_WRITEDATA, fp);
 
@@ -120,38 +139,35 @@ CURLcode get_skipssl(CURL *curl_handler, string url, char outfilename[]) {
 	return res;
 }
 
-CURLcode post_data_synchronous(CURL *curl_handler, string url, char read_filename[], char result_filename[]) {
-	mutex_push.lock();
+CURLcode post_data(CURL *curl_handler, char *url, char upload_filename[], char result_filename[]) {
 
 	curl_easy_setopt(curl_handler, CURLOPT_URL, url);
 	curl_easy_setopt(curl_handler, CURLOPT_POST, 1L);
 
-	FILE *fpin = fopen(read_filename, "rb");
+	FILE *fpin = fopen(upload_filename, "rb");
 	curl_easy_setopt(curl_handler, CURLOPT_READFUNCTION, read_data);
 	curl_easy_setopt(curl_handler, CURLOPT_READDATA, fpin);
 
-	//save response
-	FILE *fpout = fopen(result_filename, "wb");
+	/*dont save response
+	FILE *fpout = fopen(result_filename, "ab+");
 	curl_easy_setopt(curl_handler, CURLOPT_WRITEFUNCTION, write_data);
 	curl_easy_setopt(curl_handler, CURLOPT_WRITEDATA, fpout);
-
+	*/
 	CURLcode res = curl_easy_perform(curl_handler); /* post away! */
 
 	fclose(fpin);
-	fclose(fpout);
-
-	mutex_push.unlock();
+	//fclose(fpout);
 
 	return res;
 }
-CURLcode post_control_synchronous(CURL *curl_handler, string url, string post_data, char result_filename[]) {
-	mutex_push.lock();
+CURLcode post_control_synchronous(CURL *curl_handler, char *url, char *post_data, char result_filename[]) {
+	WaitForSingleObject(semaphore_resultfile, INFINITE);
 
 	curl_easy_setopt(curl_handler, CURLOPT_URL, url);
 	curl_easy_setopt(curl_handler, CURLOPT_POSTFIELDS, post_data);
-	curl_easy_setopt(curl_handler, CURLOPT_POSTFIELDSIZE, post_data.length);  //if post_data is char* use: (long)strlen(post_data)
+	curl_easy_setopt(curl_handler, CURLOPT_POSTFIELDSIZE, (long)strlen(post_data)); 
 
-	FILE *fpout = fopen(result_filename, "wb");
+	FILE *fpout = fopen(result_filename, "ab+");
 	curl_easy_setopt(curl_handler, CURLOPT_WRITEFUNCTION, write_data);
 	curl_easy_setopt(curl_handler, CURLOPT_WRITEDATA, fpout);
 
@@ -159,35 +175,41 @@ CURLcode post_control_synchronous(CURL *curl_handler, string url, string post_da
 
 	fclose(fpout);
 
-	mutex_push.unlock();
+	ReleaseSemaphore(semaphore_resultfile, 1, NULL);
 
 	return res;
 }
 
-CURLcode post_data_asynchronous(CURL *curl_handler, string url, char read_filename[], char result_filename[]) {
-
-	//post
-}
-CURLcode post_control_asynchronous(CURL *curl_handler, string url, string post_data, char result_filename[]) {
-
-	//post
-}
 #pragma endregion
 
+int task_decode(string line);
+bool task_do(int task);
+void delete_done_task_synchronous(char result_filename[]);
 
-void thread_run(CURL *curl_handler, string server_url, char result_filename[], int alive_delay_min)
+void thread_alive_run(char *server_url, char result_filename[], int alive_delay_min)
 {
-	mutex_alive.lock();
-	mutex_alive.unlock();
 
-	while (alive)
-	{
-		post_control_synchronous(curl_handler, server_url, POST_ALIVE, result_filename);
-		mutex_checkbuffer.unlock();
-		this_thread::sleep_for(chrono::minutes(alive_delay_min));
+	WaitForSingleObject(semaphore_alive,INFINITE);
+	ReleaseSemaphore(semaphore_alive, 1, NULL);
+
+	CURL *curl_handler;
+	curl_handler = curl_easy_init();
+
+	if (curl_handler) {
+
+
+		while (alive)
+		{
+			post_control_synchronous(curl_handler, server_url, POST_ALIVE, result_filename);
+			ReleaseSemaphore(semaphore_checkresult, 1, NULL);
+			this_thread::sleep_for(chrono::minutes(alive_delay_min));
+		}
+
+		curl_easy_cleanup(curl_handler);
 	}
 
 }
+
 
 void client_init(char init_filename[])
 {
@@ -195,61 +217,165 @@ void client_init(char init_filename[])
 }
 
 
-void check_orders() {
-
-
-	//just one large data post when use one connection
+void add_header_file(string header_data, char in_filename[])
+{
+	
 }
 
+void check_tasks(char result_filename[]) {
 
-#ifdef _DEBUG
+	ifstream infile;
+	infile.open(result_filename);
+	string line;
+	bool task_done = FALSE;
+	int task = TASK_UNKNOWN;
+	if (getline(infile, line)) {
+
+		task = task_decode(line);
+		if(task != TASK_INVALID)
+			task_done = task_do(task);
+	}
+
+	infile.close();
+
+	if (task==TASK_INVALID || task_done) {
+		delete_done_task_synchronous(result_filename);
+	}
+	
+}
+
+int task_decode(string line){
+	
+	return 1;
+}
+
+bool task_do(int task) {
+
+	if (task == TASK_INVALID || task == TASK_UNKNOWN)
+		return FALSE;
+
+
+	return TRUE;
+
+
+}
+
+void delete_done_task_synchronous(char result_filename[])
+{
+	char temp_filename[FILENAME_MAX] = "C:/ProgramData/tempo/temp.txt";
+	string line;
+	ifstream infile;
+	ofstream tempfile;
+
+	WaitForSingleObject(semaphore_resultfile, INFINITE);
+	
+	infile.open(result_filename);
+	tempfile.open(temp_filename);
+	for (int i =0; getline(infile, line); i++)
+	{
+		if (i != 0) {
+			tempfile << line << "\n";
+		}
+	}
+	infile.close();
+	tempfile.close();
+	remove(result_filename);
+	rename(temp_filename,result_filename);
+	remove(temp_filename);
+	ReleaseSemaphore(semaphore_resultfile, 1, NULL);
+}
+
+#define DEBUG
+#ifdef DEBUG
 	int main()
 #else
 	int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow)
 #endif
 {
 
-	string server_url = "http://127.0.0.1:6789";
+//#define _TEST
+#ifdef _TEST
+		CURL *curl_handlerm;
+		curl_handler2 = curl_easy_init();
+		char *server_url2 = "http://127.0.0.1:6789";
+		char *data = POST_INIT;
+		char result_filename2[FILENAME_MAX] = "C:/ProgramData/tempo/results.txt";
+		forbid_reuse_connection(curl_handlerm, TRUE);
+		post_control_synchronous(curl_handlerm, server_url2, POST_INIT, result_filename2);
+		cout << "\nend.";
+		_getch();
+		return 0;
+#endif
+
+	char *server_url = "http://127.0.0.1:6789";
 	int client_id = 10;
 	int alive_delay_min = 2;
+	//make a sub folder
+	char outDir[FILENAME_MAX] = "C:/ProgramData/tempo";
+	_mkdir(outDir);
+
+	char result_filename[FILENAME_MAX] = "C:/ProgramData/tempo/results.txt";
+	char download_filename[FILENAME_MAX] = "C:/ProgramData/tempo/download.txt";
+	char upload_filename[FILENAME_MAX] = "C:/ProgramData/tempo/upload.txt";
 	CURL *curl_handler;
-	char result_filename[FILENAME_MAX] = "C:/ProgramData/easy1.txt";
-	char outfilename[FILEPATH_MAX] = "E:\cb5a5782_resize.jpg";
 	
-	/*
+	
 	CURLcode get_res;
 	CURLcode upload_res;
 	char *urlsecure = "https://192.168.1.201/easy.txt";
 	char *urllarge = "http://www.bdu.ac.in/centers/uic/docs/courseware/C_Programming_Notes.pdf";
 	char *urllocal = "http://127.0.0.1:6789";
 	char *url = "http://www.google.com";
-	*/
 	
+	semaphore_alive = CreateSemaphore(
+		NULL,           // default security attributes
+		MAX_SEM_COUNT,  // initial count
+		MAX_SEM_COUNT,  // maximum count
+		NULL);			// unnamed semaphore
+	semaphore_resultfile = CreateSemaphore(NULL, MAX_SEM_COUNT, MAX_SEM_COUNT, NULL);
+	semaphore_checkresult = CreateSemaphore(NULL, 0, MAX_SEM_COUNT, NULL);
 
-	mutex_alive.lock();
-	thread thread_timing(thread_run,
-									curl_handler, server_url, result_filename, alive_delay_min);
+	dwWaitResult  = WaitForSingleObject(
+		semaphore_alive,   // handle to semaphore
+		INFINITE);		// time-out interval use 0L if dont want block
+	/*if timer expires or semaphore signals:
+	switch (dwWaitResult)
+	{
+		// The semaphore object was signaled.
+	case WAIT_OBJECT_0:
+		//...
+		break;
+		//The semaphore was nonsignaled, so a time-out occurred
+	case WAIT_TIMEOUT:
+		//...
+		break;
+	}
+	*/
+
+	thread thread_alive(thread_alive_run,
+									server_url, result_filename, alive_delay_min);
 
 	curl_handler = curl_easy_init();
 
 	if (curl_handler) {
 
 		forbid_reuse_connection(curl_handler, TRUE);
-
+		
 		//get init settings
 		post_control_synchronous(curl_handler, server_url, POST_INIT, result_filename);
 		client_init(result_filename);
 
 		//start reporting alive
-		mutex_checkbuffer.lock();
-		mutex_alive.unlock();
-
+		ReleaseSemaphore(
+			semaphore_alive,  // handle to semaphore
+			1,            // increase count by one
+			NULL);       // not interested in previous count
 		while (alive)
 		{
-			mutex_checkbuffer.lock();
-			check_orders();
+			WaitForSingleObject(semaphore_checkresult, INFINITE);
+			check_tasks(result_filename);
 		}
-
+		
 		/* always cleanup one time at end*/
 		curl_easy_cleanup(curl_handler);
 	}
@@ -259,10 +385,15 @@ void check_orders() {
 		_getch();
 	#endif
 
-	//main thread must ends after end of other threads. if want main dont wait call thread_timing.detach()
-	if (thread_timing.joinable())
+	//main thread must ends after end of other threads. if want main dont wait call thread_alive.detach()
+	if (thread_alive.joinable())
 	{
-		thread_timing.join(); // main wait untill this thread finishes.
+		thread_alive.join(); // main wait untill this thread finishes.
 	}
+	//close semophore handlers
+	CloseHandle(semaphore_alive);
+	CloseHandle(semaphore_resultfile);
+	CloseHandle(semaphore_checkresult);
+
 	return 0;
 }
