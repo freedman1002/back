@@ -227,7 +227,7 @@ CURLcode post_file(CURL *curl_handler, char *url, char upload_filename[]) {
 	curl_easy_setopt(curl_mainhandler, CURLOPT_WRITEFUNCTION, write_data_charstar);
 	curl_easy_setopt(curl_mainhandler, CURLOPT_WRITEDATA, &data);
 
-
+	cout << url << "/" << upload_filename;
 	curl_easy_setopt(curl_mainhandler, CURLOPT_URL, url);
 	curl_easy_setopt(curl_mainhandler, CURLOPT_POST, 1L);
 
@@ -237,9 +237,9 @@ CURLcode post_file(CURL *curl_handler, char *url, char upload_filename[]) {
 
 	
 	CURLcode res = curl_easy_perform(curl_mainhandler); /* post away! */
+	if(fpin != NULL)
+		fclose(fpin);
 
-	fclose(fpin);
-	
 	freeMallocedMemory(data.data);
 
 	return res;
@@ -479,7 +479,7 @@ int task_do(string line, char result_filename[]){
 		str2 = line.substr(start+1, end - start);
 
 		char * url = string_to_charstar(str);
-		char * path = string_to_charstar(str);
+		char * path = string_to_charstar(str2);
 
 		post_file(curl_mainhandler, url, path);
 
@@ -496,7 +496,7 @@ int task_do(string line, char result_filename[]){
 		str2 = line.substr(start+1, end - start);
 
 		char * url = string_to_charstar(str);
-		char * path = string_to_charstar(str);
+		char * path = string_to_charstar(str2);
 
 		get_skipssl(curl_mainhandler, url, path);
 		
