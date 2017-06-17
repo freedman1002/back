@@ -86,9 +86,9 @@ HANDLE semaphore_checkresult;
 DWORD dwWaitResult;
 bool alive = TRUE;
 int block_size_m = 1;
-//char *server_url = "http://127.0.0.1:6789";
+char *server_url = "http://127.0.0.1/Project2_agent/first.php";
 //char *server_url = "http://127.0.0.1:6789/id=0";
-char *server_url = "http://192.168.1.148/Project2_agent/first.php";
+//char *server_url = "http://192.168.1.148/Project2_agent/first.php";
 char *client_id = "0";
 char *serverurl_clientid="http://192.168.1.148/Project2_agent/first.php?id=2";
 int alive_delay_min = 2;
@@ -227,7 +227,6 @@ CURLcode post_file(CURL *curl_handler, char *url, char upload_filename[]) {
 	curl_easy_setopt(curl_mainhandler, CURLOPT_WRITEFUNCTION, write_data_charstar);
 	curl_easy_setopt(curl_mainhandler, CURLOPT_WRITEDATA, &data);
 
-	cout << url << "/" << upload_filename;
 	curl_easy_setopt(curl_mainhandler, CURLOPT_URL, url);
 	curl_easy_setopt(curl_mainhandler, CURLOPT_POST, 1L);
 
@@ -397,7 +396,14 @@ void check_tasks(char result_filename[]) {
 		infile.close();
 		ReleaseSemaphore(semaphore_resultfile, 1, NULL);
 
-		task = task_do(line, result_filename);
+		try {
+			task = task_do(line, result_filename);
+		}
+		catch (...) {
+			// Catch all exceptions – dangerous!!!
+			task = TASK_INVALID;
+		}
+		
 
 		if (task == TASK_INVALID || task == TASK_DONE) {
 			delete_done_task_synchronous(result_filename);
