@@ -41,6 +41,7 @@ typedef std::wstring String;
 #define POST_RESUME "RESUME"
 #define POST_PRIORITY "PRIORITY"
 #define POST_DONE "DONE"									//DONE;
+#define POST_FAILED "FAILED"								//FAILED;
 
 #define TASK_INVALID -1
 #define TASK_UNKNOWN 0
@@ -403,9 +404,14 @@ void check_tasks(char result_filename[]) {
 			// Catch all exceptions – dangerous!!!
 			task = TASK_INVALID;
 		}
-		
-
-		if (task == TASK_INVALID || task == TASK_DONE) {
+		if (task == TASK_INVALID) {
+			delete_done_task_synchronous(result_filename);
+			string tmp = POST_FAILED;
+			tmp += ";";
+			char *ali = string_to_charstar(tmp);
+			post_control_synchronous(curl_mainhandler, serverurl_clientid, ali, result_filename);
+		}
+		else if (task == TASK_DONE) {
 			delete_done_task_synchronous(result_filename);
 		}
 
