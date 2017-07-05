@@ -255,7 +255,8 @@ CURLcode post_file(CURL *curl_handler, char *url, char *upload_filename) {
 
 	curl_easy_setopt(curl_handler, CURLOPT_URL, url);
 	curl_easy_setopt(curl_handler, CURLOPT_UPLOAD, 1L);
-	curl_easy_setopt(curl_handler, CURLOPT_POST, 1L);
+	curl_easy_setopt(curl_handler, CURLOPT_POST, 1L); //say to use post request -not sure
+	curl_easy_setopt(curl_handler, CURLOPT_CUSTOMREQUEST, "POST"); //say to use post request -sure 
 	curl_easy_setopt(curl_handler, CURLOPT_POSTFIELDS, NULL);
 	curl_easy_setopt(curl_handler, CURLOPT_READFUNCTION, read_data);
 	curl_easy_setopt(curl_handler, CURLOPT_READDATA, fpin);
